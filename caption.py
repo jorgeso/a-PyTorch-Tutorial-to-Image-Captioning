@@ -10,8 +10,6 @@ import argparse
 from scipy.misc import imread, imresize
 from PIL import Image
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=3):
     """
@@ -24,6 +22,7 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
     :param beam_size: number of sequences to consider at each decode-step
     :return: caption, weights for visualization
     """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     k = beam_size
     vocab_size = len(word_map)
@@ -159,6 +158,7 @@ def visualize_att(image_path, seq, alphas, rev_word_map, smooth=True):
     :param rev_word_map: reverse word mapping, i.e. ix2word
     :param smooth: smooth weights?
     """
+
     image = Image.open(image_path)
     image = image.resize([14 * 24, 14 * 24], Image.LANCZOS)
 
@@ -195,6 +195,8 @@ if __name__ == '__main__':
     parser.add_argument('--dont_smooth', dest='smooth', action='store_false', help='do not smooth alpha overlay')
 
     args = parser.parse_args()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load model
     checkpoint = torch.load(args.model, map_location=str(device))

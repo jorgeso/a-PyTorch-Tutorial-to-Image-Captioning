@@ -14,7 +14,7 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
     """
     Creates input files for training, validation, and test data.
 
-    :param dataset: name of dataset, one of 'coco', 'flickr8k', 'flickr30k'
+    :param dataset: name of dataset
     :param karpathy_json_path: path of Karpathy JSON file with splits and captions
     :param image_folder: folder with downloaded images
     :param captions_per_image: number of captions to sample per image
@@ -22,8 +22,6 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
     :param output_folder: folder to save files
     :param max_len: don't sample captions longer than this length
     """
-
-    assert dataset in {'coco', 'flickr8k', 'flickr30k'}
 
     # Read Karpathy JSON
     with open(karpathy_json_path, 'r') as j:
@@ -49,8 +47,7 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
         if len(captions) == 0:
             continue
 
-        path = os.path.join(image_folder, img['filepath'], img['filename']) if dataset == 'coco' else os.path.join(
-            image_folder, img['filename'])
+        path = os.path.join(image_folder, img['filename'])
 
         if img['split'] in {'train', 'restval'}:
             train_image_paths.append(path)

@@ -10,41 +10,34 @@ from datasets import *
 from utils import *
 from nltk.translate.bleu_score import corpus_bleu
 
-# Data parameters
-output_folder = './'
-data_folder = '/media/ssd/caption data'  # folder with data files saved by create_input_files.py
-data_name = 'coco_5_cap_per_img_5_min_word_freq'  # base name shared by data files
-
-# Model parameters
-emb_dim = 512  # dimension of word embeddings
-attention_dim = 512  # dimension of attention linear layers
-decoder_dim = 512  # dimension of decoder RNN
-dropout = 0.5
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets device for model and PyTorch tensors
-cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
-
-# Training parameters
-start_epoch = 0
-epochs = 120  # number of epochs to train for (if early stopping is not triggered)
-epochs_since_improvement = 0  # keeps track of number of epochs since there's been an improvement in validation BLEU
-batch_size = 32
-workers = 1  # for data-loading; right now, only 1 works with h5py
-encoder_lr = 1e-4  # learning rate for encoder if fine-tuning
-decoder_lr = 4e-4  # learning rate for decoder
-grad_clip = 5.  # clip gradients at an absolute value of
-alpha_c = 1.  # regularization parameter for 'doubly stochastic attention', as in the paper
-best_bleu4 = 0.  # BLEU-4 score right now
-print_freq = 100  # print training/validation stats every __ batches
-fine_tune_encoder = False  # fine-tune encoder?
-checkpoint = None  # path to checkpoint, None if none
-
-
-def main():
+def main(
+    output_folder = './',
+    data_folder = '/media/ssd/caption data',  # folder with data files saved by create_input_files.py
+    data_name = 'dataname_5_cap_per_img_5_min_word_freq',  # base name shared by data files
+    emb_dim = 512,  # dimension of word embeddings
+    attention_dim = 512,  # dimension of attention linear layers
+    decoder_dim = 512,  # dimension of decoder RNN
+    dropout = 0.5,
+    start_epoch = 0,
+    epochs = 120,  # number of epochs to train for (if early stopping is not triggered)
+    epochs_since_improvement = 0,  # keeps track of number of epochs since there's been an improvement in validation BLEU
+    batch_size = 32,
+    workers = 1,  # for data-loading; right now, only 1 works with h5py
+    encoder_lr = 1e-4,  # learning rate for encoder if fine-tuning
+    decoder_lr = 4e-4,  # learning rate for decoder
+    grad_clip = 5.,  # clip gradients at an absolute value of
+    alpha_c = 1.,  # regularization parameter for 'doubly stochastic attention', as in the paper
+    best_bleu4 = 0.,  # BLEU-4 score right now
+    print_freq = 100,  # print training/validation stats every __ batches
+    fine_tune_encoder = False,  # fine-tune encoder?
+    checkpoint = None  # path to checkpoint, None if none
+):
     """
     Training and validation.
     """
 
-    global best_bleu4, epochs_since_improvement, checkpoint, start_epoch, fine_tune_encoder, data_name, word_map
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets device for model and PyTorch tensors
+    cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
 
     # Read word map
     word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
@@ -108,19 +101,31 @@ def main():
                 adjust_learning_rate(encoder_optimizer, 0.8)
 
         # One epoch's training
-        train(train_loader=train_loader,
-              encoder=encoder,
-              decoder=decoder,
-              criterion=criterion,
-              encoder_optimizer=encoder_optimizer,
-              decoder_optimizer=decoder_optimizer,
-              epoch=epoch)
+        train(
+            device=device,
+            train_loader=train_loader,
+            encoder=encoder,
+            decoder=decoder,
+            criterion=criterion,
+            encoder_optimizer=encoder_optimizer,
+            decoder_optimizer=decoder_optimizer,
+            epoch=epoch,
+            grad_clip=grad_clip,
+            alpha_c=alpha_c,
+            print_freq=print_freq
+        )
 
         # One epoch's validation
-        recent_bleu4 = validate(val_loader=val_loader,
-                                encoder=encoder,
-                                decoder=decoder,
-                                criterion=criterion)
+        recent_bleu4 = validate(
+            device=device,
+            val_loader=val_loader,
+            encoder=encoder,
+            decoder=decoder,
+            criterion=criterion,
+            alpha_c=alpha_c,
+            print_freq=print_freq,
+            word_map=word_map
+        )
 
         # Check if there was an improvement
         is_best = recent_bleu4 > best_bleu4
@@ -136,7 +141,7 @@ def main():
                         decoder_optimizer, recent_bleu4, is_best)
 
 
-def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch):
+def train(device, train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch, grad_clip, alpha_c, print_freq):
     """
     Performs one epoch's training.
 
@@ -223,7 +228,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
                                                                           top5=top5accs))
 
 
-def validate(val_loader, encoder, decoder, criterion):
+def validate(device, val_loader, encoder, decoder, criterion, alpha_c, print_freq, word_map):
     """
     Performs one epoch's validation.
 
